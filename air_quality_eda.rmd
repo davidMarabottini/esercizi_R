@@ -1,0 +1,325 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+# install.packages('lubridate')
+# install.packages("VIM")
+# install.packages("psych") 
+```
+
+```{r}
+library(corrplot)
+library(lubridate)
+library(VIM)
+library(psych)
+```
+
+<https://chatgpt.com/c/68e23a34-9bc4-8331-89bb-5d51ed943c29>
+
+# New york air quality
+
+Daily air quality measurements in New York, May to September 1973.
+
+```{r}
+data("airquality")
+airquality
+```
+
+```{r}
+help(airquality)
+```
+
+A data frame with 153 observations on 6 variables.
+
+variables:
+
+-   [,1] **Ozone**: numeric (ppb)
+
+-   [,2] **Solar.R**: numeric (lang)
+
+-   [,3] **Wind**: numeric (mph)
+
+-   [,4] **Temp**: numeric (degrees F)
+
+-   [,5] **Month**: numeric (1--12)
+
+-   [,6] **Day**: numeric (1--31)
+
+Benchè tutte le variabli siano numeriche ordinali, le variabili `ozone`,
+`Solar.R`, `Wind` e `Temp` sono quantitative, mentre `Month` e `Day`
+sono qualitative
+
+```{r}
+colSums(is.na(airquality))
+```
+
+Dalla tabella sopra emerge che ci sono 37 misurazioni mancanti per
+l'ozono e 7 per i raggi solari
+
+```{r}
+length(which(is.na(airquality)))
+```
+
+considerando che la tabella sospra evidenziava 37 casi in cui non erano
+presenti misurazioni di ozono e 7 in cui non erano presenti di raggi
+solari, e il numero di celle che hanno dati mancanti è 44, possiamo
+concludere che non ci sono righe in cui mancano contemporaneamente ozono
+e raggi solari.
+
+Cerchiamo di capire la distribuzione dei dati per comprendere come
+gestire queste mancanze
+
+```{r}
+analyze_col <- function(col, name) {
+  # par(mfrow=c(1,2))
+  boxplot(col, main=name)
+  
+  hist(col, col='yellow', freq=F, main=name)
+  # lines(density(col), lwd=2, col="red")
+  return(summary(col))
+}
+```
+
+```{r}
+summary_ozono = analyze_col(airquality$Ozone, 'Ozono')
+summary_raggi_solari = analyze_col(airquality$Solar.R, 'Raggi solari')
+
+```
+
+```{r}
+summary_ozono
+```
+
+```{r}
+print((summary_ozono[[5]] - summary_ozono[[2]])/(summary_ozono[[6]] - summary_ozono[[1]]))
+```
+
+```{r}
+(summary_raggi_solari[[5]] - summary_raggi_solari[[2]])/(summary_raggi_solari[[6]] - summary_raggi_solari[[1]])
+
+```
+
+```{r}
+matrice_cor_completa <- cor(airquality, use = "complete.obs")
+correlazioni_ozone <- matrice_cor_completa[, "Ozone"]
+round(correlazioni_ozone, 4)
+```
+
+Sembra esserci una correlazione lineare inversa discreta con Temp,
+mentre una correlazione lineare diretta forte con Temp.
+
+possiamo imputare l'ozono considerando una di queste 2 variabili
+
+```{r}
+plot(airquality$Temp, airquality$Ozone)
+plot(airquality$Wind, airquality$Ozone)
+
+```
+
+La relazione tra temperatura e ozono mi pare piu esponenziale, ma forse
+puo essere approssimata da una retta
+
+```{r}
+modello <- lm(Ozone ~ Temp , data = airquality)
+
+summary_model = summary(modello)
+m = summary_model$coefficients[, 1][['Temp']]
+q = summary_model$coefficients[, 1][['(Intercept)']]
+
+plot(airquality$Temp, airquality$Ozone)
+abline(a = q, b = m, col = "red", lwd = 2) 
+```
+
+Da questo grafico sembra evidente che la relazione sia più che altro
+logaritmica
+
+```{r}
+modello <- lm(Ozone ~ Temp , data = airquality)
+
+summary_model = summary(modello)
+m = summary_model$coefficients[, 1][['Temp']]
+q = summary_model$coefficients[, 1][['(Intercept)']]
+
+plot(airquality$Temp, airquality$Ozone)
+abline(a = q, b = m, col = "red", lwd = 2) 
+for(i in na_ozone){
+  abline(v = i, col="blue", lwd = 2)
+}
+```
+
+```{r}
+modello_log <- lm(log(Ozone) ~ Temp, data = airquality) 
+summary(modello_log)
+
+coeff_log <- summary(modello_log)$coefficients
+q_log <- coeff_log[, "Estimate"]["(Intercept)"]
+m_log <- coeff_log[, "Estimate"]["Temp"]
+
+plot(airquality$Temp, airquality$Ozone,
+     xlab = "Temperatura (Temp)",
+     ylab = "Ozono (Ozone)",
+     main = "Ozono vs. Temperatura con Curva Esponenziale (Log-Lineare)")
+
+curve(expr = exp(q_log + m_log * x), add = T, col = "darkorange", lwd = 3)
+
+```
+
+L'esponenziale sembra avere una presa migliore rispetto alla retta
+
+```{r}
+indexes_na_ozone = which(is.na(airquality$Ozone))
+temp_imputazione = airquality$Temp[indexes_na_ozone]
+valori_imputati_esponenziali = exp(q_log + m_log * temp_imputazione)
+airquality$Ozone[indexes_na_ozone] <- valori_imputati_esponenziali
+cat("Valori NA in Ozone dopo l'imputazione esponenziale:", sum(is.na(airquality$Ozone)))
+```
+
+```{r}
+# 1. Trova gli indici dei valori NA originali in Ozone (Assicurati che airquality sia il dataframe con gli NA originali)
+# Se hai già imputato airquality in precedenza, ricarica i dati o usa una copia.
+# Per chiarezza, assumiamo che tu stia lavorando sull'originale con NA:
+indici_na_ozone <- which(is.na(airquality$Ozone))
+
+# 2. Estrai la temperatura dei giorni con NA
+temp_na <- airquality$Temp[indici_na_ozone]
+
+# 3. Calcola i valori di OZONE imputati con la curva esponenziale per quei giorni
+# Formula: Ozone = exp(q_log + m_log * Temp)
+ozone_imputato <- exp(q_log + m_log * temp_na)
+
+# 4. Crea il grafico originale e la curva (il tuo codice)
+plot(airquality$Temp, airquality$Ozone,
+     xlab = "Temperatura (Temp)",
+     ylab = "Ozono (Ozone)",
+     main = "Ozono vs. Temperatura con Imputazioni Esponenziali")
+
+curve(expr = exp(q_log + m_log * x), add = TRUE, col = "darkorange", lwd = 3)
+
+```
+
+```{r}
+matrice_cor_completa <- cor(airquality, use = "complete.obs")
+correlazioni_ozone <- matrice_cor_completa[, "Solar.R"]
+round(correlazioni_ozone, 4)
+```
+
+si può notare una correlazione lineare abbastanza lieve tra raggi solari
+e ozono o raggi solari e temperatura, ma troppo bassa per utilizzarla
+direttamente come modello di imputazione.
+
+Stampo degli scatterplot per verificare eventuali correlazioni non
+lineari
+
+```{r}
+solar_r_na = airquality[is.na(airquality$Solar.R), ]
+for(n in names(airquality)) {
+  plot(airquality[[n]], airquality$Solar.R, main=n, ylab="Raggi solari", xlab=n)
+  for(i in solar_r_na) {
+    abline(v=i, col="blue", lwd = 2)
+  }
+}
+```
+
+
+```{r}
+Data_Stringa = paste("1973", airquality$Month, airquality$Day, sep = "-")
+airquality$Date_to_nr = yday(ymd(Data_Stringa))
+
+airquality
+```
+
+```{r}
+matrice_cor_completa <- cor(airquality, use = "complete.obs")
+correlazioni_ozone <- matrice_cor_completa[, "Solar.R"]
+round(correlazioni_ozone, 4)
+```
+
+Non sembrano esserci correlazioni lineari con i raggi solari
+
+Disegno uno scatterplot per verificare non lineari
+
+```{r}
+solar_r_na = airquality[is.na(airquality$Solar.R), ]
+for(name in names(airquality)) {
+  plot(airquality$Solar.R, airquality[[name]], xlab='Raggi solari', ylab=name, main=name)
+  
+  for(i in solar_r_na) {
+    abline(v=i, col="blue", lwd = 2)
+  }
+}
+```
+
+```{r}
+nr_periods = 7
+boxplot(airquality$Solar.R ~ as.integer(airquality$Date_to_nr / nr_periods),
+        main = paste("Solar.R per Blocco Temporale ", nr_periods, " giorni"),
+        xlab = paste("Blocco Temporale (Ordinal Day /",nr_periods,")"),
+        ylab = "Solar.R")
+```
+
+Non riesco a trovare alcuna relazione solida, piuttosto preferisco
+eliminare le righe e continuare
+
+```{r}
+which(is.na(airquality$Solar.R))
+```
+
+```{r}
+airquality_filtered = airquality[!is.na(airquality$Solar.R), ]
+```
+
+```{r}
+calculate_rapresentants <- function(x) c(mean(x), median(x), sd(x), var(x), min(x), max(x), summary(x))
+```
+
+```{r}
+describe(airquality_filtered)
+```
+
+```{r}
+for(name in names(airquality)) {
+  boxplot(airquality[[name]], main=name)
+}
+```
+
+-   ozone ha degli outlier alti
+
+-   i raggi solari non sembrano avere mai degli outlier
+
+-   ci sono stati dei giorni in cui il vento è stato particolarmente
+    forte
+
+-   la temperatura non ha mai raggiunto estremi
+
+-   Sui valori relativi alle date questa analisi non ha senso
+
+```{r}
+corrplot(cor(airquality, use = "complete.obs"), method = 'number')
+
+```
+
+Dalla matrice di correlazione è possibile evidenziare:
+
+-   Una correlazione diretta molto forte tra ozono e temperatura
+
+-   una correlazione inversa discretamente forte tra temperatura e vento
+
+-   altre correlazioni minori
+
+Da questo ho escluso la correlazione tra mese e la variabile artificiale
+date_to_nr in quanto si tratta di una correlazione artificiale
+
+In questo esercizio abbiamo analizzato il dataset di dati metereologici
+nella città di New york.
+
+Abbiamo scoperto che la temperatura influenza la presenza di ozono
+nell'area in modo esponenziale (anche se ben approssimabile a livello
+lineare per queste temperature) e abbiamo il sospetto che ci sia una
+correlazione a campana tra ozono e raggi solari.
+
+Inoltre abbiamo scoperto che in quei giorni l'ozono e il vento hanno
+raggiunto qualche valore anomalo anche se nulla da far pensare ad
+anomalie preoccupanti

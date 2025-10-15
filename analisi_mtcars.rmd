@@ -1,0 +1,184 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+library(corrplot)
+library(data.table)
+
+```
+
+```{r}
+printn <- function(..., mode = "", sameLn=FALSE) {
+  endColumn = ifelse(sameLn == T, "", "\n")
+  if (mode == "") {
+    cat(..., endColumn)
+  } else {
+    cat(paste0("\033[", mode, "m"), ..., "\033[0m", endColumn, sep = "")
+  }
+}
+```
+
+```{r}
+data("mtcars")
+head(mtcars)
+```
+
+```{r}
+str(mtcars)
+```
+
+I valori sono tutti numerici
+
+Dalla documentazione
+
+```{r}
+help(mtcars)
+```
+
+A data frame with 32 observations on 11 (numeric) variables.
+
+|  |  |  |
+|:-----------------------|:-----------------------|------------------------|
+| `mpg` | Miles/(US) gallon | **Variabile quantitativa continua**, consumo auto |
+| `cyl` | Number of cylinders | **Variabile quantitativa discreta**, numero di cilindri |
+| `disp` | Displacement (cu.in.) | **Variabile quantitativa continua**, Volume totale spazzato dal pistone |
+| `hp` | Gross horsepower | **Variabile quantitativa discreta**, Cavalli |
+| `drat` | Rear axle ratio | **Variabile quantitativa continua**, rapporto tra il numero di rotazioni compiute dall'albero di trasmissione e il numero di rotazioni compiute dall'asse della ruota (o semiasse) posteriore. |
+| `wt` | Weight (1000 lbs) | **Variabile quantitativa continua**, peso |
+| `qsec` | 1/4 mile time | **Variabile quantitativa continua**, Migli per quarto di secondo |
+| `vs` | Engine (0 = V-shaped, 1 = straight) | **Variabile Bernoulliana**, Tipo di motore |
+| `am` | Transmission (0 = automatic, 1 = manual) | **Variabile Bernoulliana**, Tipo di cambio |
+| `gear` | Number of forward gears | **Variabile quantitativa discreta**, nr marce |
+| `carb` | Number of carburetors | **Variabile quantitativa discreta**, nr carburatori |
+
+**L'unica variabile qualitativa presente è l'indice che indica marca e
+modello auto volendo si potrebbero creare variabili aggiuntive**
+
+```{r}
+which(is.na(mtcars))
+```
+
+Non sono presenti variabili a null
+
+```{r}
+to_factorize = c('cyl', 'hp', 'vs', 'am', 'gear', 'carb')
+mtcars_factorized <- unserialize(serialize(mtcars, NULL))
+
+for(i in to_factorize) {
+  name = paste(i, '_factorized')
+  printn(i, mode="1;36")
+  mtcars_factorized[[name]] = factor(mtcars[[i]])
+  printn(mtcars_factorized[[i]])
+}
+```
+
+Calcolo media, mediana, deviazione standard e range per tutte le
+variabili di cui ha senso farlo
+
+```{r}
+to_describe = c('mpg', 'cyl', 'disp', 'hp', 'drat', 'wt', 'qsec', 'gear', 'carb')
+for (i in to_describe){
+  curcol = mtcars_factorized[[i]]
+  printn(i, mode="1;36")
+  summary = summary(curcol)
+  for (name in names(summary)) {
+    printn("\033[1m",name,"\033[0m", ":", summary[[name]])
+  }
+  printn('\033[1mDeviazione Standard\033[0m: ', sd(curcol))
+  printn('\033[1mRange\033[0m: ', diff(range(curcol)))
+  printn('------------------------------------------')
+}
+```
+
+```{r}
+for (i in to_describe){
+  printn(i, mode="1;36")
+  outliers = boxplot(mtcars_factorized[[i]], plot=F)$out
+  message = paste('sono presenti i seguenti outliers: ', outliers, sep = ' ')
+  if(length(outliers) == 0) {
+    printn('Non sono presnti outliers', mode="1")
+  } else {
+    printn("sono presenti i seguenti outlier: ", mode="1", sameLn = T)
+    printn(paste(outliers, sep = ", "))
+  }
+  printn('-------------------')
+}
+```
+
+```{r}
+boxplot(mtcars$mpg, main="Boxplot di consumo")
+```
+
+Dal boxplot si evince che sebbene l'area tra il primo e il terzo
+percentile sia abbastanza equilibrata, e la mediana risulta ben
+posizionata in base a queste 2 aree, il grafico presenta una coda
+leggermente più lunga verso destra, anche se i valori si presentano ben
+posizionati dentro il range della normalità e non si segnalano outliers
+
+```{r}
+plot(mtcars_factorized$mpg, mtcars_factorized$hp, main="consumo vs potenza", xlab="Consumo", ylab="Potenza")
+```
+
+```{r}
+modello <- lm(hp ~ log(mpg), data = mtcars_factorized)
+modello
+
+summary_model = summary(modello)
+m = summary_model$coefficients[, 1][['log(mpg)']]
+q = summary_model$coefficients[, 1][['(Intercept)']]
+```
+
+```{r}
+plot(mtcars_factorized$mpg, mtcars_factorized$hp, main="consumo vs potenza", xlab="Consumo", ylab="Potenza")
+curve(q + m * log(x), 
+      add = TRUE, col = "red", lwd = 2)
+```
+
+Dal grafico si vede che esiste approssimare l'esistena di una relazione
+logaritmica negativa tra consumo e potenza del tipo
+
+potenza è circa 684-181\*log(consumo) nelle macchine di questo grafico
+
+```{r}
+cormap = cor(mtcars, use = "complete.obs")
+corrplot(cormap, 
+         method = "number",    
+         type = "lower", 
+         number.cex = 1.0)
+```
+
+```{r}
+cormap[1:5, 'mpg']
+```
+
+le 5 colonne che hanno le relazioni lineari più forti con mpg sono:
+
+cyl: relazione lineare inversa di 0.852, molto forte
+
+disp: relazione lineare inversa di 0.847, molto forte
+
+hp: relazione lineare inversa di 0.77, garantisce una buona correlazione
+
+drat: relazione lineare diretta di 0.68, garantisce una discreta
+correlazione lineare
+
+```{r}
+mod = lm(mpg ~ wt + hp + cyl, data = mtcars)
+summary(mod)
+```
+
+Da questa analisi ho notato quanto segue:
+
+-   il consumo è pressappoco inversamente proporzionale a cilindrata,
+    grandezza del pistone, potenza (con scala logaritmica) e
+    direttamente influenzato da rear axle ratio (non so cosa sia)
+
+-   Ho notato un pattern interessante nella relazione tra consumo e
+    potenza, come se il decrescere del risparmio energetico si smorzi a
+    tendere
+
+-   Il dataset è molto piccolo (32 sole marche) ed è improbabile che
+    questa quantità sia significativa nel mondo delle auto

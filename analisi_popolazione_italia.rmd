@@ -1,0 +1,207 @@
+```{r}
+library(ggplot2)
+library(tidyverse)
+```
+
+```{r}
+data_preparation_for_pyramid <- function(ds, maschi, femmine, group_years = 1, min_age=0, max_age=101) {
+  
+  ds_pivot = ds %>%
+    select(Età, maschi, femmine) %>%
+    filter(Età >= min_age & Età <= max_age) %>%
+    pivot_longer(cols = c(maschi, femmine), names_to="Sesso", values_to="Popolazione" ) %>%
+    
+    mutate(Popolazione = ifelse(Sesso == maschi, -Popolazione, Popolazione)) %>%
+    
+    mutate(classe_eta = floor(Età/group_years)*group_years) %>%
+    group_by(classe_eta, Sesso) %>%
+    
+    summarise(Popolazione_aggregata = sum(Popolazione)) %>%
+    mutate(gruppo_eta = paste0(classe_eta, " - ", classe_eta + group_years - 1))
+  
+  return(ds_pivot)
+}
+
+generate_pyramid_chart <- function(pivot, title) {
+  pop_max <- max(abs(pivot$Popolazione_aggregata), na.rm = TRUE)
+
+  ggplot(pivot, aes(x = classe_eta, y = Popolazione_aggregata, fill = Sesso)) +
+    
+    geom_col() +
+  
+    coord_flip() +
+    xlab("Maschi") +
+    ylab("Femmine") +
+  
+    labs(
+      title = title,
+      x = "Età",
+      y = "Popolazione",
+      fill = "Sesso"
+    ) +
+    theme_minimal()
+}
+```
+
+```{r}
+resident_italy = read.csv('sources/Popolazione_residente_italia_ISTAT_2025.csv')
+strangers_resident_italy = read.csv('sources/Popolazione straniera residente_istat_2025.csv')
+
+print(resident_italy)
+print(strangers_resident_italy)
+
+```
+
+questi rappresentano l'intera popolazione residente in Italia
+
+```{r}
+resident_italy_without_total = resident_italy[-nrow(resident_italy), ]
+resident_italy_without_total
+names(resident_italy_without_total)
+```
+
+```{r}
+latest_row = nrow(resident_italy_without_total)
+resident_italy_without_total[latest_row, "Età"] = 101
+resident_italy_without_total
+```
+
+```{r}
+resident_italy_without_total$Età = as.numeric(resident_italy_without_total$Età)
+
+resident_italy_without_total
+```
+
+```{r}
+pivoted_datas = data_preparation_for_pyramid(resident_italy_without_total, "Maschi", "Femmine")
+pivoted_datas
+```
+
+```{r}
+generate_pyramid_chart(pivoted_datas, title="Piramide dell'età popolazione totale residente in Italia")
+```
+
+La piramide della popolazione Italiana sembra toccare i suoi massimi ilvelli tra i 40 e i 65 anni e la tendenza sembra in decrescita al diminuire dell'età
+
+```{r}
+pivoted_datas_10_yrs = data_preparation_for_pyramid(resident_italy_without_total, "Totale.maschi", "Totale.femmine", group_years = 10)
+
+pivoted_datas_10_yrs
+```
+
+```{r}
+generate_pyramid_chart(pivoted_datas_10_yrs, title="Piramide dell'età residenti in Italia raggruppati per 10 anni")
+
+```
+
+```{r}
+strangers_resident_italy_without_total = strangers_resident_italy[-nrow(strangers_resident_italy), ]
+latest_row = nrow(strangers_resident_italy_without_total)
+strangers_resident_italy_without_total[latest_row, "Età"] = 101
+strangers_resident_italy_without_total$Età = as.numeric(strangers_resident_italy_without_total$Età)
+
+strangers_resident_italy_without_total
+```
+
+```{r}
+pivoted_stranges
+```
+
+```{r}
+pivoted_stranges = data_preparation_for_pyramid(strangers_resident_italy_without_total, "Maschi", "Femmine" )
+generate_pyramid_chart(pivoted_stranges, title="Piramide dell'età stranieri residenti in Italia")
+```
+
+La popolazione straniera sembra avere il massimo tra i 25 e i 40 anni , anche essa risulta in diminuzione all'abbassarsi dell'età, anche se più stabile
+
+Calcolo la percentuale di stranieri in base all'età
+
+```{r}
+perc_strangers = strangers_resident_italy_without_total %>%
+  select('Età', Totale) %>%
+  mutate(Totale = Totale/resident_italy_without_total$Totale)
+```
+
+```{r}
+pivoted_datas
+pivoted_stranges
+
+names(pivoted_stranges)
+
+pivoted_italians <- pivoted_datas
+pivoted_italians$Popolazione_aggregata <-
+  pivoted_datas$Popolazione_aggregata - pivoted_stranges$Popolazione_aggregata
+
+pivoted_italians
+
+generate_pyramid_chart(pivoted_italians, title="Piramide dell'età di cittadini Italiani residenti in Italia")
+```
+
+```{r}
+length(pivoted_stranges$Popolazione_aggregata)
+```
+
+```{r}
+#percentuale stranieri rispetto agli italiani
+plot(perc_strangers$Età, perc_strangers$Totale*100, main="Percentuale stranieri sulla popolazione  residente in Italalia per Età", xlab = "Età", ylab="Popolazione straniera (%)")
+polygon(
+  x = c(15, perc_strangers$Età[perc_strangers$Età >= 15 & perc_strangers$Età <= 74], 74),
+  y = c(0, perc_strangers$Totale[perc_strangers$Età >= 15 & perc_strangers$Età <= 74] * 100, 0),
+  col = rgb(0.1, 0.5, 0.8, 0.2),
+  border = NA
+)
+```
+
+```{r}
+media_15_65 <- mean(perc_strangers$Totale[perc_strangers$Età >= 15 & perc_strangers$Età <= 65])
+
+media_15_65*100
+```
+
+`{names(strangers_resident_italy_without_total)}`
+
+```{r}
+pivoted_stranges
+```
+
+```{r}
+residents_nationality = read.csv('sources/Popolazione residente per cittadinanza o paese di nascita_istat_2025.csv')
+```
+
+```{r}
+resident_reordered = residents_nationality %>%
+  arrange(desc(Totale)) %>%
+  filter(Cittadinanza != 'Totale')
+
+resident_reordered
+```
+
+```{r}
+tot_maschi = sum(resident_reordered$Maschi)
+tot_maschi = sum(resident_reordered$Femmine)
+
+tot_generale = sum(resident_reordered$Totale)
+```
+
+Valori relativi
+
+```{r}
+resident_reordered %>%
+  select('Anno', 'Cittadinanza', 'Totale') %>%
+  mutate(Totale = formatC(Totale*100/tot_generale, format="f", digits=2))
+```
+
+```{r}
+eta_media_totale <- weighted.mean(resident_italy_without_total$Età, resident_italy_without_total$Totale)
+eta_media_totale
+
+```
+
+```{r}
+eta_media_totale <- weighted.mean(strangers_resident_italy_without_total$Età, strangers_resident_italy_without_total$Totale)
+eta_media_totale
+```
+
+```{r}
+
+```
