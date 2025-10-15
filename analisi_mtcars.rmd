@@ -1,6 +1,8 @@
 ---
-title: "Analisi della qualità dell'aria"
-output: html_document
+title: "Analisi dataset mtcars"
+author: "David Marabottini"
+date: "`r Sys.Date()`"
+output: pdf_document
 ---
 
 ```{r}
@@ -12,7 +14,7 @@ library(data.table)
 ```{r}
 printn <- function(..., mode = "", sameLn=FALSE) {
   endColumn = ifelse(sameLn == T, "", "\n")
-  if (mode == "") {
+  if (knitr::is_latex_output() || mode == "") {
     cat(..., endColumn)
   } else {
     cat(paste0("\033[", mode, "m"), ..., "\033[0m", endColumn, sep = "")
@@ -84,10 +86,13 @@ for (i in to_describe){
   printn(i, mode="1;36")
   summary = summary(curcol)
   for (name in names(summary)) {
-    printn("\033[1m",name,"\033[0m", ":", summary[[name]])
+    printn(name, ": ", mode="1", sameLn = T)
+    printn(summary[[name]])
   }
-  printn('\033[1mDeviazione Standard\033[0m: ', sd(curcol))
-  printn('\033[1mRange\033[0m: ', diff(range(curcol)))
+  printn('Deviazione Standard', mode="1", sameLn = T)
+  printn(sd(curcol))
+  printn("Range:" , mode="1", sameLn = T)
+  printn(diff(range(curcol)))
   printn('------------------------------------------')
 }
 ```
