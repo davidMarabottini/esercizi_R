@@ -1,7 +1,6 @@
 ---
-editor_options: 
-  markdown: 
-    wrap: 72
+title: "Analisi della qualità dell'aria"
+output: html_document
 ---
 
 ```{r}
