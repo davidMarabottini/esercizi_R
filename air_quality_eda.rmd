@@ -5,13 +5,6 @@ date: "`r Sys.Date()`"
 output: pdf_document
 ---
 
-
-```{r}
-# install.packages('lubridate')
-# install.packages("VIM")
-# install.packages("psych") 
-```
-
 ```{r}
 library(corrplot)
 library(lubridate)
