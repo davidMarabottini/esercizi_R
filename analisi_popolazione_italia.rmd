@@ -1,12 +1,18 @@
 ---
-title: "analisi popolazione italia"
+title: "analisi popolazione italia v. 0.0.3"
 author: "David Marabottini"
 date: "`r Sys.Date()`"
 output: pdf_document
+version: 0.0.3
 ---
-Sorgente dei dati: https://demo.istat.it/ su "popolazione residente" e "popolazione straniera residente"
 
-```{r}
+Sorgente dei dati: <https://demo.istat.it/> su "popolazione residente" e "popolazione straniera residente"
+
+*Obiettivo*: Il seguente report analizza la struttura per età e l'impatto migratorio sulla popolazione residente in Italia nel 2025. Verranno confrontate piramidi di età su 3 tagli: residenti totali, residenti Stranieri e residenti Italiani
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+
 library(ggplot2)
 library(tidyverse)
 ```
@@ -56,72 +62,130 @@ cat('deviazione standard: ', sd(col), '\n')
 cat('distanza interquartile:', IQR(col), '\n')
 cat('range: ', diff(range(col)), '\n')
 }
+
+population_old_idx <- function(population) {
+  population %>%
+    summarise(
+      totale = sum(Totale),
+      under_14 = sum(Totale[Età <= 14]),
+      under_14_perc = under_14/totale*100,
+      over_65  = sum(Totale[Età >= 65]),
+      over_65_perc = over_65/totale*100
+    )
+}
 ```
 
 ```{r}
 resident_italy = read.csv('source/Popolazione_residente_italia_ISTAT_2025.csv', sep=";")
 strangers_resident_italy = read.csv('source/Popolazione straniera residente_istat_2025.csv', sep=";")
-
-# print(resident_italy)
-# print(strangers_resident_italy)
-
+italians_resident_italy = read.csv('source/Popolazione_italiana_residente_italia_ISTAT_2025.csv', sep=";")
 ```
 
+## Analisi sulla popolazione residente in Italia
 
 ```{r}
 pivoted_datas = data_preparation_for_pyramid(resident_italy, "maschi", "femmine")
 
 generate_pyramid_chart(pivoted_datas, title="Piramide dell'età popolazione totale residente in Italia")
+
 ```
 
-La piramide della popolazione residente in Italia sembra toccare i suoi massimi ilvelli tra i 50 e i 65 anni per poi decrescere vertiginosamente, avere una breve fase di apparente assestamento tra i 20 e 30 anni per tornare a decrescere in modo importante, con una tendenza preoccupante
+La piramide della popolazione residente in Italia sembra toccare i suoi massimi ilvelli tra i 50 e i 65 anni per poi decrescere vertiginosamente. Questo riflette il baby boom degli anni 60 e il progressivo invecchiamento della popolazione senza un ricambio generazionale altrettanto elevato
+
+```{r}
+eta_media_totale <- weighted.mean(resident_italy$Età, resident_italy$Totale)
+cat('Età media totale residenti: ', eta_media_totale)
+
+```
+
+**Dati vecchiaia**
+
+```{r}
+italy_resident_trasholds = population_old_idx(resident_italy)
+```
+
+```{r}
+italy_resident_trasholds
+```
+
+```{r}
+cat("Indice vecchiaia: ", (italy_resident_trasholds[['over_65']]/italy_resident_trasholds[['under_14']])*100)
+
+```
+
+L'età media è di 46 anni mentre l'indice di vecchiaia è a 207.
+
+Un indice sopra i 100 vuol dire che gli over 65 sono molti di più rispetto agli under 14, un indice a 207 indica che questi sono più del doppio, ciò contribuisce ad alzare significativamente l'età media
+
+------------------------------------------------------------------------
+
+## Analisi sulla popolazione Straniera residente in Italia
 
 ```{r}
 pivoted_stranges = data_preparation_for_pyramid(strangers_resident_italy, "maschi", "femmine" )
 generate_pyramid_chart(pivoted_stranges, title="Piramide dell'età stranieri residenti in Italia")
 ```
 
-Considerando solo gli stranieri, il trend sotto i 25 anni sembra simile per 5 anni anche se sembra assestarsi attorno ai 20 anni
+La piramide degli stranieri residenti presenta una forma differente, con un picco tra i 25 e 40 anni, e una drastica diminuzione oltre i 40. Inoltre, la popolazione sotto i 20 anni sembra più stabile rispetto alla piramide della popolazione totale, anche se riflette anch'essa una lieve decrescita. Questo mostra che l'immigrazione ha un ruolo importante nell'alleviare il peso dell'inverno demografico che abbiamo davanti
 
 ```{r}
-perc_strangers = strangers_resident_italy %>%
-  select('Età', Totale) %>%
-  mutate(Totale = Totale/resident_italy$Totale)
-
-names(pivoted_stranges)
-
-length(pivoted_datas$Popolazione_aggregata)
-length(pivoted_stranges$Popolazione_aggregata)
-
-pivoted_italians <- pivoted_datas
-pivoted_italians$Popolazione_aggregata <-
-  pivoted_datas$Popolazione_aggregata - pivoted_stranges$Popolazione_aggregata
-
-generate_pyramid_chart(pivoted_italians, title="Piramide dell'età di cittadini Italiani residenti in Italia")
+eta_media_stranieri <- weighted.mean(strangers_resident_italy$Età, strangers_resident_italy$Totale)
+cat('Età media totale residenti stranieri: ', eta_media_stranieri)
 ```
-Filtrando solo gli Italiani residenti in Italia viene confermata la decrescita
+
+**dati vecchiaia**
 
 ```{r}
-length(pivoted_stranges$Popolazione_aggregata)
+italy_strangers_resident_trasholds = population_old_idx(strangers_resident_italy)
+
+italy_strangers_resident_trasholds
+
 ```
 
 ```{r}
-#percentuale stranieri rispetto agli italiani
-plot(perc_strangers$Età, perc_strangers$Totale*100, main="Percentuale stranieri sulla popolazione  residente in Italalia per Età", xlab = "Età", ylab="Popolazione straniera (%)")
-polygon(
-  x = c(15, perc_strangers$Età[perc_strangers$Età >= 15 & perc_strangers$Età <= 74], 74),
-  y = c(0, perc_strangers$Totale[perc_strangers$Età >= 15 & perc_strangers$Età <= 74] * 100, 0),
-  col = rgb(0.1, 0.5, 0.8, 0.2),
-  border = NA
-)
-```
-```{r}
-working_age = perc_strangers %>% filter( perc_strangers$Età >= 15 & perc_strangers$Età <= 74)
-print(summary(working_age$Totale))
-get_stats_base(working_age$Totale)
+cat("Indice vecchiaia: ", (italy_strangers_resident_trasholds[['over_65']]/italy_strangers_resident_trasholds[['under_14']])*100)
 ```
 
-Nel grafico mostro la percentuale di stranieri sulla popolazione Italiana, e, come si è già visto mettendo assieme i grafici precedenti, la percentuale sembra in crescita, e in età lavorativa sembra esserci una percentuale di stranieri tra il 2 e il 17%, com media e mediana attorno al 10%, con una tendenza in crescita per i prossimi 20 anni
+L'età media per i soli Stranieri è a 36 anni circa mentre l'indice è a 39.45.
+
+Questo indica che tra gli stranieri gli under 14 sono più del doppio degli over 65
+
+------------------------------------------------------------------------
+
+## Analisi sulla popolazione Italiana residente in Italia
+
+```{r}
+pivoted_italians = data_preparation_for_pyramid(italians_resident_italy, "maschi", "femmine" )
+generate_pyramid_chart(pivoted_italians, title="Piramide dell'età Italiani residenti in Italia")
+```
+
+Filtrando solo gli Italiani, la piramide conferma la forte decrescita nelle classi di età più giovane. L'assenza della componente straniera mostra ancor di più l'inverno demografico che si sta configurando in Italia
+
+```{r}
+italy_citizen_resident_trasholds = population_old_idx(italians_resident_italy)
+
+```
+
+```{r}
+eta_media_italiani <- weighted.mean(italians_resident_italy$Età, italians_resident_italy$Totale)
+cat('Età media totale residenti Italiani: ', eta_media_italiani)
+```
+
+**dati vecchiaia**
+
+```{r}
+italy_citizen_resident_trasholds
+```
+
+```{r}
+cat("Indice vecchiaia: ", (italy_citizen_resident_trasholds[['over_65']]/italy_citizen_resident_trasholds[['under_14']])*100)
+```
+
+L'età media è a 47 mentre l'indice di vecchiaia (non mitigato) è a 231, che vuol dire un peggioramento importante della situazione rispetto ai dati presi su tutta la popolazione residente
+
+------------------------------------------------------------------------
+
+## Percentuale della popolazione Straniera in Italia ripartita per età
 
 ```{r}
 residents_nationality = read.csv('source/Popolazione residente per cittadinanza o paese di nascita_istat_2025.csv')
@@ -133,7 +197,33 @@ resident_reordered = residents_nationality %>%
   filter(Cittadinanza != 'Totale')
 ```
 
-Valori relativi
+```{r}
+perc_strangers = strangers_resident_italy %>%
+  select('Età', Totale) %>%
+  mutate(Totale = Totale/resident_italy$Totale)
+
+```
+
+```{r}
+#percentuale stranieri su totale popolazione
+plot(perc_strangers$Età, perc_strangers$Totale*100, main="Percentuale stranieri sulla popolazione  residente in Italalia per Età", xlab = "Età", ylab="Popolazione straniera (%)")
+polygon(
+  x = c(15, perc_strangers$Età[perc_strangers$Età >= 15 & perc_strangers$Età <= 63], 63),
+  y = c(0, perc_strangers$Totale[perc_strangers$Età >= 15 & perc_strangers$Età <= 63] * 100, 0),
+  col = rgb(0.1, 0.5, 0.8, 0.2),
+  border = NA
+)
+```
+
+In questo grafico mostro la percentuale di stranieri rispetto alla popolazione.
+
+Ho evidenziato la fascia 15, 64 anni in quanto è la fascia lavorativa.
+
+è evidente che la quantità di stranieri supera la soglia del 10% tra le fasce giovani
+
+------------------------------------------------------------------------
+
+## Ulteriori informazioni
 
 ```{r}
 cat('Ci sono ',length(residents_nationality$Cittadinanza), 'Cittadinanze in Italia\n')
@@ -145,19 +235,10 @@ resident_reordered %>%
   slice_head(n = 5)
 ```
 
-```{r}
-eta_media_totale <- weighted.mean(resident_italy$Età, resident_italy$Totale)
-eta_media_totale
+------------------------------------------------------------------------
 
-```
+## Conclusioni
 
-```{r}
-eta_media_totale <- weighted.mean(strangers_resident_italy$Età, strangers_resident_italy$Totale)
-eta_media_totale
-```
+La percentuale di stranieri in età lavorativa nel paese è in crescita, aiutandoci sia ad alleviare i sintomi dell'inverno demografico di cui l'Italia soffre, sia probabilmete a garantire un apporto importante di forza lavoro, tasse e a reggere il sistema pensionistico.
 
-L'età media di tutta la popolazione totale è di 46 anni, l'età media degli stranieri è di 36, 10 anni, ciò però vuol dire che l'età media dei soli Italiani si può trovare dall'equazione x*0.91+36*0.09=46, ovvero (46-36\*0.09)/0.91 = 46.98 ovvero 47 anni.
-
-C'è un divario di età media di 10 anni tra Italiani e Stranieri
-
-Tutti questi dati implica che l'immigrazione straniera in Italia contribuisce significativamente ad abbassare l'età media della popolazione e alleviare il peso dell'inverno demografico che stiamo vivendo
+Sarebbe interessante incrociare questi dati con dati economici per avere conferme o smentite circa il beneficio apportato nella situazione economica Italiana.
