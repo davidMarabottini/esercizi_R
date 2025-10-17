@@ -1,20 +1,28 @@
 ---
-title: "analisi popolazione italia v. 0.0.3"
+title: "analisi popolazione italia v. 0.0.4"
 author: "David Marabottini"
 date: "`r Sys.Date()`"
-output: pdf_document
-version: 0.0.3
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+version: 0.0.4
 ---
 
-Sorgente dei dati: <https://demo.istat.it/> su "popolazione residente" e "popolazione straniera residente"
-
 *Obiettivo*: Il seguente report analizza la struttura per età e l'impatto migratorio sulla popolazione residente in Italia nel 2025. Verranno confrontate piramidi di età su 3 tagli: residenti totali, residenti Stranieri e residenti Italiani
+
+*Sorgente dei dati:* <https://demo.istat.it/> su "popolazione residente" e "popolazione straniera residente", per quanto riguarda la popolazione Italiana residente, è stato creato su excel come differenza tra le residenze totali e le residenze straniere
+
+**I csv sono stati puliti, controllati e preelaborati con power query**
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F, message = F, warning = F)
 
 library(ggplot2)
 library(tidyverse)
+library(knitr)
+
 ```
 
 ```{r}
@@ -73,6 +81,107 @@ population_old_idx <- function(population) {
       over_65_perc = over_65/totale*100
     )
 }
+
+calculate_quantiles <- function(x, freq, probs = c(0, 0.25, 0.5, 0.75, 1)) {
+  # Controllo di base
+  if (length(x) != length(freq)) {
+    stop("Le lunghezze di x e freq non coincidono.")
+  }
+
+  # Rimuove valori con frequenza nulla (non servono per il calcolo)
+  valid <- freq > 0
+  x <- x[valid]
+  freq <- freq[valid]
+
+  # Ordina per età
+  ord <- order(x)
+  x <- x[ord]
+  freq <- freq[ord]
+
+  # Cumulative e totale
+  cumfreq <- cumsum(freq)
+  N = sum(freq)
+  if (N == 0) stop("Tutte le frequenze sono zero!")
+
+  # Calcolo dei quantili con interpolazione
+  results = sapply(probs, function(p) {
+    target = p * N
+    i = which(cumfreq >= target)[1]
+    if (is.na(i)) {
+      stop(paste("Nessun indice trovato per il quantile", p))
+    }
+    if (i == 1) return(x[1])
+    x0 = x[i - 1]
+    x1 = x[i]
+    f0 = cumfreq[i - 1]
+    f1 = cumfreq[i]
+    return(x0 + (x1 - x0) * (target - f0) / (f1 - f0))
+  })
+
+  return(results)
+}
+
+preliminary_checks <- function(residents, title) {
+  # ---- Stampo il boxplot ----
+  par(mfrow = c(1, 3), oma = c(0, 0, 3, 0))
+  
+  males = boxplot(residents$maschi, main = "Maschi", ylab = "Numero di Residenti")
+  females = boxplot(residents$femmine, main = "Femmine", ylab = "")
+  total = boxplot(residents$Totale, main = "Totale", ylab = "")
+  
+    # ---- Quartili ----
+  print("Maschi")
+  print("Quartili")
+  quart_maschi = calculate_quantiles(residents$Età, residents$maschi)
+  print(quart_maschi)
+  cat("Distanza interqurtile: ", quart_maschi[4] - quart_maschi[2], "\n")
+  cat("Range: ", quart_maschi[5] - quart_maschi[1], "\n")
+  
+  print("Femmine")
+  print("Quartili")
+  quart_femmine = calculate_quantiles(residents$Età, residents$femmine)
+  print(quart_femmine)
+  cat("Distanza interqurtile: ", quart_femmine[4] - quart_femmine[2], "\n")
+  cat("Range: ", quart_femmine[5] - quart_femmine[1], "\n")
+  
+    print("Totale")
+  print("Quartili")
+  quart_tot = calculate_quantiles(residents$Età, residents$Totale)
+  print(quart_tot)
+  cat("Distanza interqurtile: ", quart_tot[4] - quart_tot[2], "\n")
+  cat("Range: ", quart_tot[5] - quart_tot[1], "\n")
+  
+  mtext(title, outer = TRUE, cex = 1.2, font = 2, line = 0.5)
+  
+  par(mfrow = c(1, 1), oma = c(0, 0, 0, 0))
+  
+  # ---- Calcolo le medie ----
+  
+  n_maschi = sum(residents$maschi)
+  n_femmine = sum(residents$femmine)
+  n_totale = sum(residents$Totale)
+  
+  media_maschi = sum(residents$Età * residents$maschi)/n_maschi
+  media_femmine = sum(residents$Età * residents$femmine)/n_femmine
+  media_totale = sum(residents$Età * residents$Totale)/n_totale
+  
+  # ---- Varianze ----
+  var_maschi  = sum(residents$maschi  * (residents$Età - media_maschi)^2) / n_maschi
+  var_femmine = sum(residents$femmine * (residents$Età - media_femmine)^2) / n_femmine
+  var_totale  = sum(residents$Totale  * (residents$Età - media_totale)^2) / n_totale
+
+  # ---- Calcolo gli outliers ----
+  
+    risultati_df <- data.frame(
+    Statistica = c("Media Età", "Varianza", "Deviazione standard", "N° Outlier"),
+    Maschi  = c(media_maschi, var_maschi, sqrt(var_maschi), length(males$out)),
+    Femmine = c(media_femmine, var_femmine, sqrt(var_femmine), length(females$out)),
+    Totale  = c(media_totale, var_totale, sqrt(var_femmine), length(total$out))
+  )
+  
+  # ---- Tabella formattata ----
+  kable(risultati_df, digits = 2, caption = paste("Statistiche per", title))
+}
 ```
 
 ```{r}
@@ -80,6 +189,34 @@ resident_italy = read.csv('source/Popolazione_residente_italia_ISTAT_2025.csv', 
 strangers_resident_italy = read.csv('source/Popolazione straniera residente_istat_2025.csv', sep=";")
 italians_resident_italy = read.csv('source/Popolazione_italiana_residente_italia_ISTAT_2025.csv', sep=";")
 ```
+
+## Analisi integrità dei dati
+
+### Verifica degli outliers
+
+```{r}
+preliminary_checks(resident_italy, "Distribuzione dei Residenti in Italia per Sesso (Boxplot)")
+```
+
+```{r}
+preliminary_checks(strangers_resident_italy, "Distribuzione dei Residenti stranieri in Italia per Sesso (Boxplot)")
+```
+
+La maggior parte dei residenti stranieri sembra concentrata nella fascia di età tra 20 e 50 anni, con una distanza interquartile per gli uomini di 25 anni e per le donne di 27. Sembra che le donne siano più anziane degli uomini, con una mediana che sta a 39 anni, contro i 34 degli uomini.
+
+L'età media risulta abbastanza allineata alla mediana, con 34 anni per gli uomini e 38 per le donne.
+
+L'allineamento di media e mediana, la deviazione standard (18, 19) e distanza interquartile basse rispetto al range (100) rendono media e mediana buoni indicatori per l'età dello straniero medio
+
+```{r}
+preliminary_checks(italians_resident_italy, "Distribuzione dei Residenti Italiani in Italia per Sesso (Boxplot)")
+```
+
+La maggior parte dei residenti Italiani sembra concentrata nella fascia di età tra 27 e 65 anni, con una distanza interquartile di 37 anni. Sembra che le donne siano più anziane degli uomini, pur avendo di fatto la stessa distanza interquartile, come se questa fosse lievemente traslata
+
+L'età media e la mediana sono distanti di 2 anni sia per gli uomini (46 - 48) che per le donne (49 - 51) mentre la deviazione standard risulta a 23 per gli uomini e 24 per le donne
+
+Qui la situazione anagrafica risulta più eterogenea, anche se mediamente con una fascia più alta dell'età
 
 ## Analisi sulla popolazione residente in Italia
 
@@ -90,11 +227,11 @@ generate_pyramid_chart(pivoted_datas, title="Piramide dell'età popolazione tota
 
 ```
 
-La piramide della popolazione residente in Italia sembra toccare i suoi massimi ilvelli tra i 50 e i 65 anni per poi decrescere vertiginosamente. Questo riflette il baby boom degli anni 60 e il progressivo invecchiamento della popolazione senza un ricambio generazionale altrettanto elevato
+**Età media**
 
 ```{r}
 eta_media_totale <- weighted.mean(resident_italy$Età, resident_italy$Totale)
-cat('Età media totale residenti: ', eta_media_totale)
+eta_media_totale
 
 ```
 
@@ -128,9 +265,11 @@ generate_pyramid_chart(pivoted_stranges, title="Piramide dell'età stranieri res
 
 La piramide degli stranieri residenti presenta una forma differente, con un picco tra i 25 e 40 anni, e una drastica diminuzione oltre i 40. Inoltre, la popolazione sotto i 20 anni sembra più stabile rispetto alla piramide della popolazione totale, anche se riflette anch'essa una lieve decrescita. Questo mostra che l'immigrazione ha un ruolo importante nell'alleviare il peso dell'inverno demografico che abbiamo davanti
 
+**Età media**
+
 ```{r}
 eta_media_stranieri <- weighted.mean(strangers_resident_italy$Età, strangers_resident_italy$Totale)
-cat('Età media totale residenti stranieri: ', eta_media_stranieri)
+eta_media_stranieri
 ```
 
 **dati vecchiaia**
@@ -166,9 +305,11 @@ italy_citizen_resident_trasholds = population_old_idx(italians_resident_italy)
 
 ```
 
+**Età media**
+
 ```{r}
 eta_media_italiani <- weighted.mean(italians_resident_italy$Età, italians_resident_italy$Totale)
-cat('Età media totale residenti Italiani: ', eta_media_italiani)
+eta_media_italiani
 ```
 
 **dati vecchiaia**
