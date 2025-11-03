@@ -44,6 +44,27 @@ italians_resident_italy = read.csv('dati/Popolazione_italiana_residente_italia_I
 preliminary_checks(resident_italy, "Distribuzione dei Residenti in Italia per Sesso (Boxplot)")
 ```
 
+### Piramide popolazione
+```{r}
+pivoted_datas = data_preparation_for_pyramid(resident_italy, "maschi", "femmine")
+
+generate_pyramid_chart(pivoted_datas, title="Piramide dell'età popolazione totale residente in Italia")
+```
+
+### Dati vecchiaia
+
+```{r}
+italy_resident_trasholds = population_old_idx(resident_italy)
+italy_resident_trasholds
+
+cat("Indice vecchiaia: ", (italy_resident_trasholds[['over_65']]/italy_resident_trasholds[['under_14']])*100)
+```
+
+
+L'età media è di 46 anni mentre l'indice di vecchiaia è a 207.
+
+Un indice sopra i 100 vuol dire che gli over 65 sono molti di più rispetto agli under 14, un indice a 207 indica che questi sono più del doppio, ciò contribuisce ad alzare significativamente l'età media
+------------------------------------------------------------------------
 ```{r}
 preliminary_checks(strangers_resident_italy, "Distribuzione dei Residenti stranieri in Italia per Sesso (Boxplot)")
 ```
@@ -54,54 +75,6 @@ L'età media risulta abbastanza allineata alla mediana, con 34 anni per gli uomi
 
 L'allineamento di media e mediana, la deviazione standard (18, 19) e distanza interquartile basse rispetto al range (100) rendono media e mediana buoni indicatori per l'età dello straniero medio
 
-```{r}
-preliminary_checks(italians_resident_italy, "Distribuzione dei Residenti Italiani in Italia per Sesso (Boxplot)")
-```
-
-La maggior parte dei residenti Italiani sembra concentrata nella fascia di età tra 27 e 65 anni, con una distanza interquartile di 37 anni. Sembra che le donne siano più anziane degli uomini, pur avendo di fatto la stessa distanza interquartile, come se questa fosse lievemente traslata
-
-L'età media e la mediana sono distanti di 2 anni sia per gli uomini (46 - 48) che per le donne (49 - 51) mentre la deviazione standard risulta a 23 per gli uomini e 24 per le donne
-
-Qui la situazione anagrafica risulta più eterogenea, anche se mediamente con una fascia più alta dell'età
-
-## Analisi sulla popolazione residente in Italia
-
-```{r}
-pivoted_datas = data_preparation_for_pyramid(resident_italy, "maschi", "femmine")
-
-generate_pyramid_chart(pivoted_datas, title="Piramide dell'età popolazione totale residente in Italia")
-
-```
-
-**Età media**
-
-```{r}
-eta_media_totale <- weighted.mean(resident_italy$Età, resident_italy$Totale)
-eta_media_totale
-
-```
-
-**Dati vecchiaia**
-
-```{r}
-italy_resident_trasholds = population_old_idx(resident_italy)
-```
-
-```{r}
-italy_resident_trasholds
-```
-
-```{r}
-cat("Indice vecchiaia: ", (italy_resident_trasholds[['over_65']]/italy_resident_trasholds[['under_14']])*100)
-
-```
-
-L'età media è di 46 anni mentre l'indice di vecchiaia è a 207.
-
-Un indice sopra i 100 vuol dire che gli over 65 sono molti di più rispetto agli under 14, un indice a 207 indica che questi sono più del doppio, ciò contribuisce ad alzare significativamente l'età media
-
-------------------------------------------------------------------------
-
 ## Analisi sulla popolazione Straniera residente in Italia
 
 ```{r}
@@ -111,12 +84,6 @@ generate_pyramid_chart(pivoted_stranges, title="Piramide dell'età stranieri res
 
 La piramide degli stranieri residenti presenta una forma differente, con un picco tra i 25 e 40 anni, e una drastica diminuzione oltre i 40. Inoltre, la popolazione sotto i 20 anni sembra più stabile rispetto alla piramide della popolazione totale, anche se riflette anch'essa una lieve decrescita. Questo mostra che l'immigrazione ha un ruolo importante nell'alleviare il peso dell'inverno demografico che abbiamo davanti
 
-**Età media**
-
-```{r}
-eta_media_stranieri <- weighted.mean(strangers_resident_italy$Età, strangers_resident_italy$Totale)
-eta_media_stranieri
-```
 
 **dati vecchiaia**
 
@@ -134,8 +101,18 @@ cat("Indice vecchiaia: ", (italy_strangers_resident_trasholds[['over_65']]/italy
 L'età media per i soli Stranieri è a 36 anni circa mentre l'indice è a 39.45.
 
 Questo indica che tra gli stranieri gli under 14 sono più del doppio degli over 65
-
 ------------------------------------------------------------------------
+
+```{r}
+preliminary_checks(italians_resident_italy, "Distribuzione dei Residenti Italiani in Italia per Sesso (Boxplot)")
+```
+
+La maggior parte dei residenti Italiani sembra concentrata nella fascia di età tra 27 e 65 anni, con una distanza interquartile di 37 anni. Sembra che le donne siano più anziane degli uomini, pur avendo di fatto la stessa distanza interquartile, come se questa fosse lievemente traslata
+
+L'età media e la mediana sono distanti di 2 anni sia per gli uomini (46 - 48) che per le donne (49 - 51) mentre la deviazione standard risulta a 23 per gli uomini e 24 per le donne
+
+Qui la situazione anagrafica risulta più eterogenea, anche se mediamente con una fascia più alta dell'età
+
 
 ## Analisi sulla popolazione Italiana residente in Italia
 
@@ -149,13 +126,6 @@ Filtrando solo gli Italiani, la piramide conferma la forte decrescita nelle clas
 ```{r}
 italy_citizen_resident_trasholds = population_old_idx(italians_resident_italy)
 
-```
-
-**Età media**
-
-```{r}
-eta_media_italiani <- weighted.mean(italians_resident_italy$Età, italians_resident_italy$Totale)
-eta_media_italiani
 ```
 
 **dati vecchiaia**
@@ -175,23 +145,18 @@ L'età media è a 47 mentre l'indice di vecchiaia (non mitigato) è a 231, che v
 ## Percentuale della popolazione Straniera in Italia ripartita per età
 
 ```{r}
-residents_nationality = read.csv('source/Popolazione residente per cittadinanza o paese di nascita_istat_2025.csv')
+residents_nationality = read.csv('dati/Popolazione residente per cittadinanza o paese di nascita_istat_2025.csv')
 ```
 
 ```{r}
 resident_reordered = residents_nationality %>%
   arrange(desc(Totale)) %>%
   filter(Cittadinanza != 'Totale')
-```
 
-```{r}
 perc_strangers = strangers_resident_italy %>%
   select('Età', Totale) %>%
   mutate(Totale = Totale/resident_italy$Totale)
 
-```
-
-```{r}
 #percentuale stranieri su totale popolazione
 plot(perc_strangers$Età, perc_strangers$Totale*100, main="Percentuale stranieri sulla popolazione  residente in Italalia per Età", xlab = "Età", ylab="Popolazione straniera (%)")
 polygon(

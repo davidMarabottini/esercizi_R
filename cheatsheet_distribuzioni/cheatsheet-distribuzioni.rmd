@@ -1,0 +1,442 @@
+---
+title: "Cheatsheet Distribuzioni"
+author: "David Marabottini"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+  
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    toc_depth: 3
+---
+
+# Distribuzioni
+
+In questo pdf riassumo tutte le distribuzioni
+
+Per disegnare le distribuzioni nel seguente pdf mi avvalgo della seguente funzione R
+
+```{r}
+create_chart_fn <- function(rdistr, distr, discreet=F, n=1000, ...) {
+  set.seed(123)
+  x = rdistr(n, ...)
+
+  if(!discreet) {
+    hist(
+      x,
+      probability = T,
+      col = "lightblue",
+      border = "white",
+      xlab = "x"
+    )
+    curve(
+      distr(x, ...),
+      from = min(x),
+      to = max(x),
+      add = T,
+      col = "red",
+      lwd = 2
+    )
+  } else {
+    tab = table(x) / length(x)
+    
+    bar_centers = barplot(
+      tab,
+      col = "lightblue",
+      border = "white",
+      ylab = "Probabilità"
+    )
+    
+    points(
+      bar_centers,
+      #as.numeric(names(tab)),
+      distr(as.numeric(names(tab)), ...), 
+      col = "red",
+      pch = 19
+    )
+  }
+}
+```
+
+## Distribuzioni discrete
+
+### Bernoulli
+
+**Definizione:**
+
+Esperimento con solo 2 esiti possibili
+
+| Esito | probabilità | Definizione |
+|-------|-------------|-------------|
+| 0     | p           | Insuccesso  |
+| 1     | 1-p         | Successo    |
+
+**Legge**:
+
+$$
+X € \{0,1\}, P(X = x) = p^x(1-p)^{1-x}
+$$
+
+-   **Media**: E[X] = p
+
+-   **Varianza**: Var[X] = p(1-p)
+
+**Stimatori**:
+
+-   media: $\hat{p} = \bar{X} = \frac{1}{n}\sum_{i=1}^{n}X_i$
+
+-   varianza: $S^2 = \bar{X}(1-\bar{X}) = \hat{p}(1-\hat{p})$
+
+**Esempio:**
+
+-   Probabilità che lanciando una moneta esca testa piuttosto che croce
+
+-   Probabilità che una persona abbia una specifica malattia
+
+**Relazioni:**
+
+-   Somma di n Bernoulli(p) -\> Binomiale(n, p)
+
+### Binomiale
+
+```{r}
+create_chart_fn(rbinom,dbinom, discreet=T, size=100, prob=0.5 )
+```
+
+**Definizione:**
+
+Conta il numero di successi in n prove Bernoulliane indipendenti
+
+**Legge:**
+
+$$
+p(X = k) = \binom{n}{k} * p^k(1-p)^{n-k}
+$$
+
+-   **Media**: E(X) = n\*p
+
+-   **Varianza**: Var(X) = np(1-p)
+
+**Stimatori:**
+
+-   media: $\hat{p} = \frac{\bar{X}}{n}$
+
+-   varianza: $Var(X) = \frac{\bar{X}}{n}(1- \frac{\bar{X}}{n})n = \hat{p}(1-\hat{p})n$
+
+**Esempio:**
+
+-   Numero di prodotti difettosi in un lotto di n pezzi
+
+-   Numero di persone con una malattia in una determinata popolazione
+
+**Relazioni:**
+
+-   da approfondire relazione con poisson
+
+### Geometrica
+
+```{r}
+create_chart_fn(rgeom, dgeom, discreet=T, prob=0.5 )
+```
+
+**Definizione:**
+
+Numero di prove fino al primo successo
+
+**Legge**:
+
+$$
+P(X = K) = (1-p)^{k-1}p, k = 1,2,...
+$$
+
+-   **Media**: E(X) = 1/p
+
+-   **Varianza**: Var(X) = $(1-p)/p^2$
+
+**Stimatori**:
+
+-   **Media**: $\hat{p} = 1/\bar{X}$
+
+-   **Varianza**: S\^2 = $\frac{\bar{X}-1}{\bar{X}^2}$
+
+**Esempio**:
+
+Numero di tiri di dado fino ad ottenere il primo 6
+
+**Relazioni:**
+
+Somma di r geometriche -\> negativo binomiale
+
+### Poisson
+
+```{r}
+create_chart_fn(rpois, dpois, discreet=T, lambda=0.5 )
+```
+
+**Definizione:**
+
+Numero di eventi indipendenti in intervallo con media $\lambda$
+
+**Legge:**
+
+$$
+P(X = k) = e^{-\lambda}*\frac{\lambda^k}{k!}, k = 0,1,2,...
+$$
+
+-   **Media** = E(X) = **varianza** = Var(X) = $\lambda$
+
+**Stimatori**:
+
+$media=\hat{\lambda}=varianza=S^2=\bar{X}$
+
+**Esempio:**
+
+Numero di e-mail ricevute in un ora
+
+**Relazioni:**
+
+Limite della binomiale per n $\to \infty$
+
+## Distribuzioni continue
+
+### Uniforme continua
+
+```{r}
+create_chart_fn(runif,dunif, min=0, max=1)
+```
+
+**Definizione:**
+
+Ogni valore tra a e b con la stessa possibilità
+
+**Legge:**
+
+$$
+f(x) =
+\begin{cases} 
+\frac{1}{b-a} & \text{se } a \le x \le b \\ 
+0 & \text{se } altrimenti 
+\end{cases}
+$$
+
+-   Media: E(X) = (a+b)/2
+
+-   Varianza: Var(X) = $(b-a)^2/12$
+
+**Stimatori:**
+
+-   $\hat{a} = min(X_i)$
+
+-   $\hat{b} = max(X_i)$
+
+-   media campionaria = $\bar{X}$
+
+**Esempio:**
+
+Numero casuale tra 0 e 1
+
+**Relazione:**
+
+Base per la generazione di distribuzioni con trasformazioni invrse
+
+### Esponenziale
+
+```{r}
+create_chart_fn(rexp,dexp, rate=0.5)
+```
+
+**Definizione**:
+
+Tempo di attesa tra 2 eventi di poisson consecutivi
+
+$$
+f(x) = \lambda*e^{-\lambda x}, x \ge 0
+$$
+
+**media**: $1/\lambda$
+
+**varianza**: $1/\lambda^2$
+
+**Stimatori:**
+
+-   $\hat{\lambda} = 1/\bar{X}$
+
+-   $\sigma^2 = \bar{X}^2$
+
+**Esempio:**
+
+Tempo fino al prossimo arrivo o guasto
+
+**Relazioni:**
+
+-   Somma di k esponenziali -\> Gamma(k, $\lambda$)
+
+### Normale
+
+```{r}
+create_chart_fn(rnorm, dnorm, mean=0, sd=1)
+```
+
+Variabile continua con densità simmetrica e a campana
+
+$$
+f(x) = \frac{e^{-\frac{(x-\mu)^2}{2\sigma^2}}}{\sigma\sqrt{2\pi}}
+$$
+
+-   **Media**: $\mu$
+
+-   **Varianza**: $\sigma^2$
+
+**Stimatori**:
+
+-   $\hat{\mu} = \bar{X}$
+
+-   $\sigma^2 = 1/n\sum_{i=1}^n(X_i - \bar{X)^2}$
+
+-   $s^2 = \frac{\sum_{i=1}^n(X_i - \bar{X)^2}}{n-1}$
+
+**Distribuzioni derivate:**
+
+-   $\hat{X} \sim N(\mu,\sigma^2/n)$
+
+-   $\frac{n-1S^2}{\sigma^2}\sim\chi^2_{n-1}$
+
+-   $\frac{\bar{X}-\mu}{s/\sqrt{n}}\sim t_{n-1}$
+
+**Esempio:**
+
+-   Errori sperimentali
+
+-   Distribuzione altezze in una popolazione
+
+-   Distribuzione di medie campionarie
+
+### Gamma
+
+```{r}
+create_chart_fn(rgamma, dgamma, shape=3, scale=2)
+```
+
+Definizione:
+
+Somma di variabili esponenziali indipendenti
+
+Legge:
+
+$$
+f(x) = \frac{x^{\alpha-1}*e^{-x/\beta}}{\Gamma(\alpha)\beta^\alpha}
+$$
+
+### Chi-quadro
+
+```{r}
+create_chart_fn(rchisq, dchisq, df=5)
+#df -> gradi di libertà
+```
+
+**Definizione:**
+
+Somma dei quadrati di k variabili N(0,1)
+
+$$
+f(x)=\frac{x^{k/2-1}e^{-x/2}}{2^{k/2}\Gamma(k/2)}, x>0
+$$
+
+**media**: k
+
+**varianza**: 2k
+
+**stimatori:**
+
+-   Se $X_i \sim N(\mu, \sigma^2) \to \hat\sigma^2 = S^2$
+
+**Esempio:**
+
+-   Test di bontà dell'adattamento
+
+-   Test sulle varianze
+
+Relazioni:
+
+-   Caso particolare di gamma(k/2, 2)
+
+-   Base per t e F
+
+### T di student
+
+```{r}
+create_chart_fn(rt, dt, df=5)
+```
+
+Definizione:
+
+Rapporto tra una normale standard e la radice quadrata di una chi quadro normalizzata
+
+Legge:
+
+$$
+T = \frac{Z}{\sqrt{U/v}}, Z \sim N(0,1), U \sim \chi^2(v)
+$$
+
+Media: 0
+
+Varianza: $\frac{v}{v-2}, v > 2$
+
+Stimatori:
+
+-   se $X_i \sim N(\mu, \sigma^2)$ =\> $\frac{\bar{X}-\mu}{S/\sqrt{n}} \sim t_{n-1}$ -\> usata per stimare intervalli di confidenza con $\sigma^2$ ignota
+
+**Esempio**:
+
+Analisi inferenziale per piccole dimensioni campionarie
+
+**Relazioni**:
+
+Per $v\to \infty \to$ Normale standard
+
+### F di Fisher
+
+```{r}
+
+# create_chart_fn(rf, df, df1=5, df2=10)
+```
+
+**Definizione**:
+
+Rapporto tra due variabili chi-quadro normalizzate.
+
+**Legge**:
+
+$$
+F = \frac{U_1/d_1}{U_2/d_2}, U_1 \sim \chi^2(d_1),  U_2 \sim \chi^2(d_2)
+$$
+
+-   **Media**: $\frac{d_2}{d_2-2}, d2 > 2$
+
+**Stimatori collegati**:
+
+-   Confronto di due varianze campionarie $F = \frac{S_1^2/\sigma_1^2}{S_2^2/\sigma_2^2} \sim F(d1,d2)$ usata come test per $H_0: \sigma_1^2 = \sigma_2^2$
+
+**Esempio:**
+
+-   Analisi ANOVA
+
+-   Test omoschedasticità
+
+**Relazioni:**
+
+-   $1/F(d_1,d_2) \sim F(d_2, d_1)$
+
+-   Se $d_1 = 1, F = T^2$
+
+## Distribuzioni asintotiche (per stimatori)
+
+| Teorema | Risultato | Applicazione |
+|-----------------------|---------------------|----------------------------|
+| Legge dei grandi numeri | $\bar{X} \to \mu$ | Consistenza stimatori |
+| Limite Centrale (CLT) | $\frac{\hat{X}-\mu}{\sigma/\sqrt{n}} \to N(0,1)$ | Approssimazione normale |
+| Informazione di Fisher | $Var(\theta) \approx [I(\theta)]^{-1}$ | Varianza asintotica MLE |
